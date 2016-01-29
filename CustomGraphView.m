@@ -83,14 +83,24 @@
 - (void)calculateXPoints
 {
     self.xPointsMutableArray = [@[]mutableCopy];
-    [self.datesArray enumerateObjectsUsingBlock:^(NSDate *date, NSUInteger idx, BOOL * _Nonnull stop) {
+    
+    if (self.datesArray.count > 0) {
+        [self.datesArray enumerateObjectsUsingBlock:^(NSDate *date, NSUInteger idx, BOOL * _Nonnull stop) {
+            
+            int pointValueInMiliSeconds = [date timeIntervalSince1970];
+            int zeroPointValueInMiliSeconds = [self.fromDate timeIntervalSince1970];
+            double xPointDouble = (pointValueInMiliSeconds - zeroPointValueInMiliSeconds) * self.timelineUnit;
+            NSNumber *xPoint = [NSNumber numberWithDouble:xPointDouble + GRAPH_MARGIN];
+            [self.xPointsMutableArray addObject:xPoint];
+        }];
+    } else {
         
-        int pointValueInMiliSeconds = [date timeIntervalSince1970];
-        int zeroPointValueInMiliSeconds = [self.fromDate timeIntervalSince1970];
-        double xPointDouble = (pointValueInMiliSeconds - zeroPointValueInMiliSeconds) * self.timelineUnit;
-        NSNumber *xPoint = [NSNumber numberWithDouble:xPointDouble + GRAPH_MARGIN];
-        [self.xPointsMutableArray addObject:xPoint];
-    }];
+        double timeLineUnit = self.graphWidth/(self.valuesArray.count - 1);
+        [self.valuesArray enumerateObjectsUsingBlock:^(NSNumber *value, NSUInteger idx, BOOL * _Nonnull stop) {
+            [self.xPointsMutableArray addObject:[NSNumber numberWithDouble:idx*timeLineUnit + GRAPH_MARGIN]];
+        }];
+        
+    }
 }
 
 #pragma mark GET Y Points
@@ -135,14 +145,12 @@
         [self drawVerticalLineForDate:[self.datesArray objectAtIndex:idx]];
         [self drawIntervalsForValueAtIndex:idx];
         int currentDateTimeInterval = [[self.datesArray objectAtIndex:idx]timeIntervalSince1970];
-
-        if (currentDateTimeInterval <= maxDateTimeInterval && currentDateTimeInterval >= minDateTimeInterval) {
+        
+        if (idx != 0) {
+            CGPoint lastPoint = [self getPointForValueAtIndex:idx -1];
+            CGPoint currentPoint = [self getPointForValueAtIndex:idx];
             
-            if (idx != 0) {
-                
-                CGPoint lastPoint = [self getPointForValueAtIndex:idx -1];
-                CGPoint currentPoint = [self getPointForValueAtIndex:idx];
-                
+            if (currentDateTimeInterval <= maxDateTimeInterval && currentDateTimeInterval >= minDateTimeInterval) {
                 int currentDateTimeInterval = [[self.datesArray objectAtIndex:idx]timeIntervalSince1970];
                 int maxDateTimeInterval = [self.toDate timeIntervalSince1970];
                 int minDateTimeInterval = [self.fromDate timeIntervalSince1970];
@@ -156,13 +164,23 @@
                     
                     //Draw it
                     CGContextStrokePath(context);
-                    [self drawCirclesOnValuePoints];
+                    //[self drawCirclesOnValuePoints];
                 }
+            } else {
+                CGContextRef context = UIGraphicsGetCurrentContext();
+                CGContextSetStrokeColorWithColor(context, [UIColor blackColor].CGColor);
+                CGContextSetLineWidth(context, self.frame.size.height/(self.frame.size.height-self.frame.size.height/10));
+                
+                CGContextMoveToPoint(context, lastPoint.x, lastPoint.y);
+                CGContextAddLineToPoint(context, currentPoint.x, currentPoint.y);
+                
+                //Draw it
+                CGContextStrokePath(context);
+                //[self drawCirclesOnValuePoints];
             }
-            
-            
         }
     }];
+    [self drawCirclesOnValuePoints];
 }
 
 // DRAW CIRCLES OR ADD CUSTOM VIEWS
@@ -170,7 +188,7 @@
 - (void)drawCirclesOnValuePoints
 {
     [self.valuesArray enumerateObjectsUsingBlock:^(NSNumber *value, NSUInteger idx, BOOL * _Nonnull stop) {
-       
+        
         
         //id viewForValue = [self.valuePointViewsArray objectAtIndex:idx];
         int viewWidth = (int)self.frame.size.height/25<10?self.frame.size.height/25:10;
@@ -193,7 +211,6 @@
         [self addSubview:circleView];
     }];
 }
-
 
 //Draw graph axis
 
@@ -289,9 +306,33 @@
                     
                     [self addSubview:rangeView];
                 }
+            } else if (index + 1 == self.valuesArray.count) {
+                CGPoint pointForCurrentIntervalValue = [self getPointForValueAtIndex:index];
+                CGPoint pointForNextIntervalValue = CGPointMake(self.frame.size.width - GRAPH_MARGIN, 0);
+                double rangeWidth = pointForNextIntervalValue.x - pointForCurrentIntervalValue.x;
+                double valueYPoint = self.frame.size.height - (rangeHigh - self.valuesMin) * self.valuesUnit - GRAPH_MARGIN;
+                
+                if (rangeHeight > 0) {
+                    
+                    UIView *rangeView = [[UIView alloc]initWithFrame:CGRectMake(pointForCurrentIntervalValue.x, valueYPoint, rangeWidth, rangeHeight)];
+                    rangeView.backgroundColor = [UIColor darkGrayColor];
+                    rangeView.alpha = 0.1;
+                    
+                    [self addSubview:rangeView];
+                }
             }
         }
     }
+}
+
+- (void)calculateHorizontalLinesScale
+{
+    
+}
+
+- (void)calculateVerticalLinesScale
+{
+    
 }
 
 - (void)setShowGrid:(BOOL)showGrid
